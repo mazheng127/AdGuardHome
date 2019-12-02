@@ -165,7 +165,7 @@ func handleFilteringSetURL(w http.ResponseWriter, r *http.Request) {
 		Name:    fj.Data.Name,
 		URL:     fj.Data.URL,
 	}
-	found := filterSet(fj.URL, f)
+	found := filterSetProperties(fj.URL, f)
 	if !found {
 		http.Error(w, "URL doesn't exist", http.StatusBadRequest)
 		return

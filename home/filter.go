@@ -68,14 +68,16 @@ func userFilter() filter {
 	return f
 }
 
-func filterSet(url string, newf filter) bool {
+// Update properties for a filter specified by its URL
+// Return true if a filter was found.
+func filterSetProperties(url string, newf filter) bool {
 	config.Lock()
 	defer config.Unlock()
 
 	for i := range config.Filters {
 		f := &config.Filters[i]
 		if f.URL == url {
-			log.Debug("filter set: %s: {%s %s %v}", f.URL, newf.Name, newf.URL, newf.Enabled)
+			log.Debug("filter: set properties: %s: {%s %s %v}", f.URL, newf.Name, newf.URL, newf.Enabled)
 			f.Name = newf.Name
 			f.URL = newf.URL
 
@@ -84,8 +86,10 @@ func filterSet(url string, newf filter) bool {
 				if f.Enabled {
 					e := f.load()
 					if e != nil {
+						// This isn't a fatal error,
+						//  because it may occur when someone removes the file from disk.
+						// In this case the periodic update task will try to download the file.
 						f.LastUpdated = time.Time{}
-						log.Tracef("%s filter load: %v", url, e)
 					}
 				} else {
 					f.unload()
@@ -95,34 +99,6 @@ func filterSet(url string, newf filter) bool {
 		}
 	}
 	return false
-}
-
-// Enable or disable a filter
-func filterEnable(url string, enable bool) bool {
-	r := false
-	config.Lock()
-	for i := range config.Filters {
-		filter := &config.Filters[i] // otherwise we will be operating on a copy
-		if filter.URL == url {
-			filter.Enabled = enable
-			if enable {
-				e := filter.load()
-				if e != nil {
-					// This isn't a fatal error,
-					//  because it may occur when someone removes the file from disk.
-					// In this case the periodic update task will try to download the file.
-					filter.LastUpdated = time.Time{}
-					log.Tracef("%s filter load: %v", url, e)
-				}
-			} else {
-				filter.unload()
-			}
-			r = true
-			break
-		}
-	}
-	config.Unlock()
-	return r
 }
 
 // Return TRUE if a filter with this URL exists
