@@ -338,6 +338,13 @@ func (d *Dnsfilter) CheckHost(host string, qtype uint16, setts *RequestFiltering
 	return Result{}, nil
 }
 
+// Return TRUE of host name matches a wildcard pattern
+func matchDomainWildcard(host, wildcard string) bool {
+	return len(wildcard) >= 2 &&
+		wildcard[0] == '*' && wildcard[1] == '.' &&
+		strings.HasSuffix(host, wildcard[1:])
+}
+
 // Process rewrites table
 // . Find CNAME for a domain name
 //  . if found, set domain name to canonical name
@@ -351,7 +358,9 @@ func (d *Dnsfilter) processRewrites(host string, qtype uint16) Result {
 
 	for _, r := range d.Rewrites {
 		if r.Domain != host {
-			continue
+			if !matchDomainWildcard(host, r.Domain) {
+				continue
+			}
 		}
 
 		ip := net.ParseIP(r.Answer)
@@ -366,7 +375,9 @@ func (d *Dnsfilter) processRewrites(host string, qtype uint16) Result {
 
 	for _, r := range d.Rewrites {
 		if r.Domain != host {
-			continue
+			if !matchDomainWildcard(host, r.Domain) {
+				continue
+			}
 		}
 
 		ip := net.ParseIP(r.Answer)
