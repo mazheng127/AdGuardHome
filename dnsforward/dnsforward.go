@@ -310,7 +310,7 @@ func (s *Server) Prepare(config *ServerConfig) error {
 // Called by 'tls' package when Client Hello is received
 // If the server name (from SNI) supplied by client is incorrect - we terminate the ongoing TLS handshake.
 func (s *Server) onGetCertificate(ch *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	if ch.ServerName != s.conf.ServerName {
+	if len(s.conf.ServerName) != 0 && ch.ServerName != s.conf.ServerName {
 		log.Info("DNS: TLS: unknown SNI in Client Hello: %s", ch.ServerName)
 		return nil, fmt.Errorf("Invalid SNI")
 	}
