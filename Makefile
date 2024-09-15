@@ -1,35 +1,145 @@
-GIT_VERSION := $(shell git describe --abbrev=4 --dirty --always --tags)
-NATIVE_GOOS = $(shell unset GOOS; go env GOOS)
-NATIVE_GOARCH = $(shell unset GOARCH; go env GOARCH)
-GOPATH := $(shell go env GOPATH)
-JSFILES = $(shell find client -path client/node_modules -prune -o -type f -name '*.js')
-STATIC = build/static/index.html
-CHANNEL ?= release
+# Keep the Makefile POSIX-compliant.  We currently allow hyphens in
+# target names, but that may change in the future.
+#
+# See https://pubs.opengroup.org/onlinepubs/9699919799/utilities/make.html.
+.POSIX:
 
-TARGET=AdGuardHome
+# This comment is used to simplify checking local copies of the
+# Makefile.  Bump this number every time a significant change is made to
+# this Makefile.
+#
+# AdGuard-Project-Version: 6
 
-.PHONY: all build clean
-all: build
+# Don't name these macros "GO" etc., because GNU Make apparently makes
+# them exported environment variables with the literal value of
+# "${GO:-go}" and so on, which is not what we need.  Use a dot in the
+# name to make sure that users don't have an environment variable with
+# the same name.
+#
+# See https://unix.stackexchange.com/q/646255/105635.
+GO.MACRO = $${GO:-go}
+VERBOSE.MACRO = $${VERBOSE:-0}
 
-build: $(TARGET)
+CHANNEL = development
+CLIENT_DIR = client
+COMMIT = $$( git rev-parse --short HEAD )
+DEPLOY_SCRIPT_PATH = not/a/real/path
+DIST_DIR = dist
+GOAMD64 = v1
+GOPROXY = https://proxy.golang.org|direct
+GOSUMDB = sum.golang.google.cn
+GOTOOLCHAIN = go1.23.1
+GOTELEMETRY = off
+GPG_KEY = devteam@adguard.com
+GPG_KEY_PASSPHRASE = not-a-real-password
+NPM = npm
+NPM_FLAGS = --prefix $(CLIENT_DIR)
+NPM_INSTALL_FLAGS = $(NPM_FLAGS) --quiet --no-progress --ignore-engines\
+	--ignore-optional --ignore-platform --ignore-scripts
+RACE = 0
+SIGN = 1
+SIGNER_API_KEY = not-a-real-key
+VERSION = v0.0.0
+YARN = yarn
 
-client/node_modules: client/package.json client/package-lock.json
-	npm --prefix client install
-	touch client/node_modules
+NEXTAPI = 0
 
-$(STATIC): $(JSFILES) client/node_modules
-	npm --prefix client run build-prod
+# Macros for the build-release target.  If FRONTEND_PREBUILT is 0, the
+# default, the macro $(BUILD_RELEASE_DEPS_$(FRONTEND_PREBUILT)) expands
+# into BUILD_RELEASE_DEPS_0, and so both frontend and backend
+# dependencies are fetched and the frontend is built.  Otherwise, if
+# FRONTEND_PREBUILT is 1, only backend dependencies are fetched and the
+# frontend isn't rebuilt.
+#
+# TODO(a.garipov): We could probably do that from .../build-release.sh,
+# but that would mean either calling make from inside make or
+# duplicating commands in two places, both of which don't seem to me
+# like nice solutions.
+FRONTEND_PREBUILT = 0
+BUILD_RELEASE_DEPS_0 = deps js-build
+BUILD_RELEASE_DEPS_1 = go-deps
 
-$(TARGET): $(STATIC) *.go home/*.go dhcpd/*.go dnsfilter/*.go dnsforward/*.go
-	GOOS=$(NATIVE_GOOS) GOARCH=$(NATIVE_GOARCH) GO111MODULE=off go get -v github.com/gobuffalo/packr/...
-	PATH=$(GOPATH)/bin:$(PATH) packr -z
-	CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=$(GIT_VERSION) -X main.channel=$(CHANNEL)" -asmflags="-trimpath=$(PWD)" -gcflags="-trimpath=$(PWD)"
-	PATH=$(GOPATH)/bin:$(PATH) packr clean
+ENV = env\
+	CHANNEL='$(CHANNEL)'\
+	COMMIT='$(COMMIT)'\
+	DEPLOY_SCRIPT_PATH='$(DEPLOY_SCRIPT_PATH)' \
+	DIST_DIR='$(DIST_DIR)'\
+	GO="$(GO.MACRO)"\
+	GOAMD64='$(GOAMD64)'\
+	GOPROXY='$(GOPROXY)'\
+	GOSUMDB='$(GOSUMDB)'\
+	GOTELEMETRY='$(GOTELEMETRY)'\
+	GOTOOLCHAIN='$(GOTOOLCHAIN)'\
+	GPG_KEY='$(GPG_KEY)'\
+	GPG_KEY_PASSPHRASE='$(GPG_KEY_PASSPHRASE)'\
+	PATH="$${PWD}/bin:$$( "$(GO.MACRO)" env GOPATH )/bin:$${PATH}"\
+	RACE='$(RACE)'\
+	SIGN='$(SIGN)'\
+	SIGNER_API_KEY='$(SIGNER_API_KEY)' \
+	NEXTAPI='$(NEXTAPI)'\
+	VERBOSE="$(VERBOSE.MACRO)"\
+	VERSION="$(VERSION)"\
 
-clean:
-	$(MAKE) cleanfast
-	rm -rf build
-	rm -rf client/node_modules
+# Keep the line above blank.
 
-cleanfast:
-	rm -f $(TARGET)
+ENV_MISC = env\
+	VERBOSE="$(VERBOSE.MACRO)"\
+
+# Keep the line above blank.
+
+# Keep this target first, so that a naked make invocation triggers a
+# full build.
+build: deps quick-build
+
+quick-build: js-build go-build
+
+deps: js-deps go-deps
+lint: js-lint go-lint
+test: js-test go-test
+
+# Here and below, keep $(SHELL) in quotes, because on Windows this will
+# expand to something like "C:/Program Files/Git/usr/bin/sh.exe".
+build-docker: ; $(ENV) "$(SHELL)" ./scripts/make/build-docker.sh
+
+build-release: $(BUILD_RELEASE_DEPS_$(FRONTEND_PREBUILT))
+	$(ENV) "$(SHELL)" ./scripts/make/build-release.sh
+
+clean: ; $(ENV) "$(SHELL)" ./scripts/make/clean.sh
+init:  ; git config core.hooksPath ./scripts/hooks
+
+js-build: ; $(NPM) $(NPM_FLAGS) run build-prod
+js-deps:  ; $(NPM) $(NPM_INSTALL_FLAGS) ci
+js-lint:  ; $(NPM) $(NPM_FLAGS) run lint
+js-test:  ; $(NPM) $(NPM_FLAGS) run test
+
+go-bench:     ; $(ENV) "$(SHELL)"    ./scripts/make/go-bench.sh
+go-build:     ; $(ENV) "$(SHELL)"    ./scripts/make/go-build.sh
+go-deps:      ; $(ENV) "$(SHELL)"    ./scripts/make/go-deps.sh
+go-env:       ; $(ENV) "$(GO.MACRO)" env
+go-fuzz:      ; $(ENV) "$(SHELL)"    ./scripts/make/go-fuzz.sh
+go-lint:      ; $(ENV) "$(SHELL)"    ./scripts/make/go-lint.sh
+# TODO(a.garipov): Think about making RACE='1' the default for all
+# targets.
+go-test:      ; $(ENV) RACE='1' "$(SHELL)" ./scripts/make/go-test.sh
+go-tools:     ; $(ENV)          "$(SHELL)" ./scripts/make/go-tools.sh
+go-upd-tools: ; $(ENV)          "$(SHELL)" ./scripts/make/go-upd-tools.sh
+
+go-check: go-tools go-lint go-test
+
+# A quick check to make sure that all operating systems relevant to the
+# development of the project can be typechecked and built successfully.
+go-os-check:
+	env GOOS='darwin'  "$(GO.MACRO)" vet ./internal/...
+	env GOOS='freebsd' "$(GO.MACRO)" vet ./internal/...
+	env GOOS='openbsd' "$(GO.MACRO)" vet ./internal/...
+	env GOOS='linux'   "$(GO.MACRO)" vet ./internal/...
+	env GOOS='windows' "$(GO.MACRO)" vet ./internal/...
+
+
+openapi-lint: ; cd ./openapi/ && $(YARN) test
+openapi-show: ; cd ./openapi/ && $(YARN) start
+
+txt-lint: ; $(ENV) "$(SHELL)" ./scripts/make/txt-lint.sh
+
+md-lint:  ; $(ENV_MISC) "$(SHELL)" ./scripts/make/md-lint.sh
+sh-lint:  ; $(ENV_MISC) "$(SHELL)" ./scripts/make/sh-lint.sh

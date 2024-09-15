@@ -6,6 +6,13 @@
     width: 345px;
 }
 
+@media (max-width: 425px) {
+    .toasts {
+        right: 0;
+        width: 100%;
+    }
+}
+
 .toast {
     display: flex;
     align-items: flex-start;
@@ -45,6 +52,11 @@
     background: transparent;
     border: 0;
     cursor: pointer;
+}
+
+.toast__dismiss:hover,
+.toast__dismiss:focus {
+    outline: none;
 }
 
 .toast-enter {

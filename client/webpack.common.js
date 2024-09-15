@@ -1,24 +1,32 @@
-const path = require('path');
-const autoprefixer = require('autoprefixer');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const ExtractTextPlugin = require('extract-text-webpack-plugin');
-const webpack = require('webpack');
-const flexBugsFixes = require('postcss-flexbugs-fixes');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
-const CopyPlugin = require('copy-webpack-plugin');
+import path from 'path';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import { CleanWebpackPlugin } from 'clean-webpack-plugin';
+import CopyPlugin from 'copy-webpack-plugin';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import * as url from 'url';
+import { BUILD_ENVS } from './constants.js';
+
+// eslint-disable-next-line no-underscore-dangle
+const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
 const RESOURCES_PATH = path.resolve(__dirname);
-const ENTRY_REACT = path.resolve(RESOURCES_PATH, 'src/index.js');
-const ENTRY_INSTALL = path.resolve(RESOURCES_PATH, 'src/install/index.js');
-const ENTRY_LOGIN = path.resolve(RESOURCES_PATH, 'src/login/index.js');
+const ENTRY_REACT = path.resolve(RESOURCES_PATH, 'src/index.tsx');
+const ENTRY_INSTALL = path.resolve(RESOURCES_PATH, 'src/install/index.tsx');
+const ENTRY_LOGIN = path.resolve(RESOURCES_PATH, 'src/login/index.tsx');
 const HTML_PATH = path.resolve(RESOURCES_PATH, 'public/index.html');
 const HTML_INSTALL_PATH = path.resolve(RESOURCES_PATH, 'public/install.html');
 const HTML_LOGIN_PATH = path.resolve(RESOURCES_PATH, 'public/login.html');
-const FAVICON_PATH = path.resolve(RESOURCES_PATH, 'public/favicon.png');
+const ASSETS_PATH = path.resolve(RESOURCES_PATH, 'public/assets');
 
 const PUBLIC_PATH = path.resolve(__dirname, '../build/static');
+const PUBLIC_ASSETS_PATH = path.resolve(PUBLIC_PATH, 'assets');
+
+const BUILD_ENV = BUILD_ENVS[process.env.BUILD_ENV];
+
+const isDev = BUILD_ENV === BUILD_ENVS.dev;
 
 const config = {
+    mode: BUILD_ENV,
     target: 'web',
     context: RESOURCES_PATH,
     entry: {
@@ -32,14 +40,22 @@ const config = {
     },
     resolve: {
         modules: ['node_modules'],
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
     },
     module: {
         rules: [
             {
-                test: /\.css$/,
-                use: ExtractTextPlugin.extract({
-                    fallback: 'style-loader',
-                    use: [{
+                test: /\.ya?ml$/,
+                type: 'json',
+                use: 'yaml-loader',
+            },
+            {
+                test: /\.css$/i,
+                use: [
+                    {
+                        loader: MiniCssExtractPlugin.loader,
+                    },
+                    {
                         loader: 'css-loader',
                         options: {
                             importLoaders: 1,
@@ -47,61 +63,20 @@ const config = {
                     },
                     {
                         loader: 'postcss-loader',
-                        options: {
-                            ident: 'postcss',
-                            plugins: () => [
-                                flexBugsFixes,
-                                autoprefixer({
-                                    browsers: [
-                                        '>1%',
-                                        'last 4 versions',
-                                        'Firefox ESR',
-                                        'not ie < 9',
-                                    ],
-                                    flexbox: 'no-2009',
-                                }),
-                            ],
-                        },
                     },
-                    ],
-                }),
+                ],
             },
             {
-                test: /\.js$/,
+                test: /\.tsx?$/,
                 exclude: /node_modules/,
                 use: {
-                    loader: 'babel-loader',
-                    options: {
-                        cacheDirectory: true,
-                        presets: [
-                            ['env', {
-                                modules: false,
-                            }],
-                            'react',
-                            'stage-2',
-                        ],
-                        plugins: ['transform-runtime', 'transform-object-rest-spread'],
-                    },
-                },
-            },
-            {
-                exclude: [/\.js$/, /\.html$/, /\.json$/, /\.css$/],
-                use: {
-                    loader: 'url-loader',
-                    options: {
-                        fallback: 'file-loader',
-                        name: 'media/[name].[hash:8].[ext]',
-                        limit: 10 * 1024,
-                    },
+                    loader: 'ts-loader',
                 },
             },
         ],
     },
     plugins: [
-        new webpack.DefinePlugin({
-            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
-        }),
-        new CleanWebpackPlugin(['*.*'], {
+        new CleanWebpackPlugin({
             root: PUBLIC_PATH,
             verbose: false,
             dry: false,
@@ -126,13 +101,19 @@ const config = {
             filename: 'login.html',
             template: HTML_LOGIN_PATH,
         }),
-        new ExtractTextPlugin({
-            filename: '[name].[contenthash].css',
+        new MiniCssExtractPlugin({
+            filename: isDev ? '[name].css' : '[name].[hash].css',
+            chunkFilename: isDev ? '[id].css' : '[id].[hash].css',
         }),
-        new CopyPlugin([
-            { from: FAVICON_PATH, to: PUBLIC_PATH },
-        ]),
+        new CopyPlugin({
+            patterns: [
+                {
+                    from: ASSETS_PATH,
+                    to: PUBLIC_ASSETS_PATH,
+                },
+            ],
+        }),
     ],
 };
 
-module.exports = config;
+export default config;

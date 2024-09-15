@@ -1,25 +1,9 @@
-const StyleLintPlugin = require('stylelint-webpack-plugin');
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
-const merge = require('webpack-merge');
-const common = require('./webpack.common.js');
+import { merge } from 'webpack-merge';
+import common from './webpack.common.js';
 
-
-module.exports = merge(common, {
-    module: {
-        rules: [{
-            test: /\.js$/,
-            exclude: /node_modules/,
-            loader: 'eslint-loader',
-            options: {
-                failOnError: true,
-                configFile: 'prod.eslintrc',
-            },
-        }],
+export default merge(common, {
+    stats: 'minimal',
+    performance: {
+        hints: false,
     },
-    plugins: [
-        new StyleLintPlugin({
-            files: '**/*.css',
-        }),
-        new UglifyJsPlugin(),
-    ],
 });

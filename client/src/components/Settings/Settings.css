@@ -18,8 +18,21 @@
     font-size: 14px;
 }
 
+.form__group--input {
+    max-width: 300px;
+    margin: 0 1.5rem 10px;
+}
+
 .form__group--checkbox {
     margin-bottom: 25px;
+}
+
+.form__group--inner .form__group--checkbox {
+    margin-bottom: 12px;
+}
+
+.form__group--inner .form__group--checkbox:last-child {
+    margin-bottom: 0;
 }
 
 .form__inline {
@@ -57,27 +70,27 @@
     color: #cd201f;
 }
 
+.form__message--left-pad {
+    padding-left: 0.85rem;
+}
+
 .interface__title {
     font-size: 13px;
     font-weight: 700;
 }
 
 .interface__ip:after {
-    content: ", ";
+    content: ', ';
 }
 
 .interface__ip:last-child:after {
-    content: "";
-}
-
-.dhcp {
-    min-height: 450px;
+    content: '';
 }
 
 .form__desc {
     margin-top: 10px;
     font-size: 13px;
-    color: rgba(74, 74, 74, 0.7);
+    color: var(--scolor);
 }
 
 .form__desc--top {
@@ -90,6 +103,14 @@
 
 .form__label--with-desc {
     margin-bottom: 0;
+}
+
+.form__label--bot {
+    margin-bottom: 10px;
+}
+
+.form__label--top {
+    margin-top: 10px;
 }
 
 .form__status {
@@ -112,6 +133,12 @@
     justify-content: center;
     width: 30px;
     height: 30px;
+    background-color: transparent;
+    overflow: hidden;
+}
+
+.btn-icon--green {
+    color: var(--green);
 }
 
 .btn-icon-sm {
@@ -123,7 +150,9 @@
 
 .custom-control-label,
 .custom-control-label:before {
-    transition: 0.3s ease-in-out background-color, 0.3s ease-in-out color;
+    transition:
+        0.3s ease-in-out background-color,
+        0.3s ease-in-out color;
 }
 
 .custom-select:disabled {
@@ -131,5 +160,7 @@
 }
 
 .custom-select {
-    transition: 0.3s ease-in-out background-color, 0.3s ease-in-out color;
+    transition:
+        0.3s ease-in-out background-color,
+        0.3s ease-in-out color;
 }
